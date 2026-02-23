@@ -98,7 +98,7 @@ local function StartMonitoring(remote)
         SendWebhook({
             content = mention,
             embeds = {{
-                title = "🎣 RENN-B PRIVATE SERVER || CONGRATULATION !",
+                title = "⚡RENN-B PRIVATE SERVER || CONGRATULATION !",
                 color = colors[data.Rarity],
                 fields = {
                     {name="Player", value="```"..data.Player.."```", inline=true},
@@ -115,6 +115,7 @@ end
 for _, v in pairs(game:GetDescendants()) do pcall(StartMonitoring, v) end
 game.DescendantAdded:Connect(StartMonitoring)
 
-Tabs.Main:AddButton({Title="Renn Hook Test", Callback=function() SendWebhook({content="⚡RENNHOOK SERVER MONITORING ||\n STATUS : READY !!"}) end})
+Tabs.Main:AddButton({Title="Renn Hook Test", Callback=function() SendWebhook({content="[⚡] RENNHOOK SERVER MONITORING [⚡]\n [ STATUS : READY !! ]"}) end})
 Window:SelectTab(1)
+
 Fluent:Notify({Title="Renn Logger", Content="RennHook PRIVATE", Duration=5})
