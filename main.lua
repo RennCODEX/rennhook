@@ -115,6 +115,7 @@ end
 for _, v in pairs(game:GetDescendants()) do pcall(StartMonitoring, v) end
 game.DescendantAdded:Connect(StartMonitoring)
 
-Tabs.Main:AddButton({Title="Test Webhook", Callback=function() SendWebhook({content="✅ VVIP Webhook Ready!"}) end})
+Tabs.Main:AddButton({Title="Test Webhook", Callback=function() SendWebhook({content=":bluethunder: RENN PRIVATE-HOOK ON SERVER !"}) end})
 Window:SelectTab(1)
+
 Fluent:Notify({Title="rennXvincent Logger", Content="VVIP Webhook", Duration=5})
