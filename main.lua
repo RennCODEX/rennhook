@@ -132,6 +132,61 @@ local Mutations = {
 ----------------------------------------------------------------
 
 local FishDatabase = {}
+local FishIndexByNormalizedName = {}
+
+local function normalizeFishName(name)
+    if not name then
+        return ""
+    end
+    local normalized = tostring(name):lower()
+    normalized = normalized:gsub("[%p_]", " ")
+    normalized = normalized:gsub("%s+", " ")
+    normalized = normalized:match("^%s*(.-)%s*$") or ""
+    return normalized
+end
+
+local function getModuleSourceText(moduleScript)
+    local sourceText = nil
+    local okDirect, direct = pcall(function()
+        return moduleScript.Source
+    end)
+    if okDirect and type(direct) == "string" and direct ~= "" then
+        sourceText = direct
+    end
+
+    if (not sourceText or sourceText == "") and decompile then
+        local okDec, dec = pcall(function()
+            return decompile(moduleScript)
+        end)
+        if okDec and type(dec) == "string" and dec ~= "" then
+            sourceText = dec
+        end
+    end
+    return sourceText
+end
+
+local function parseFishFromModuleSource(sourceText, moduleName)
+    if type(sourceText) ~= "string" or sourceText == "" then
+        return nil
+    end
+
+    local itemType = sourceText:match('Type%s*=%s*"([^"]+)"') or sourceText:match("Type%s*=%s*'([^']+)'")
+    if itemType ~= "Fish" then
+        return nil
+    end
+
+    local name = sourceText:match('Name%s*=%s*"([^"]+)"') or sourceText:match("Name%s*=%s*'([^']+)'") or moduleName
+    local icon = sourceText:match('Icon%s*=%s*"([^"]+)"') or sourceText:match("Icon%s*=%s*'([^']+)'") or ""
+    local idStr = sourceText:match("Id%s*=%s*(%d+)")
+
+    return {
+        Name = name,
+        Icon = icon,
+        Tier = "Unknown",
+        SellPrice = 0,
+        Id = idStr and tonumber(idStr) or 0
+    }
+end
 
 local function buildFishDatabase()
     local success, ItemsFolder = pcall(function()
@@ -139,32 +194,44 @@ local function buildFishDatabase()
     end)
 
     if not success or not ItemsFolder then
-        warn("[FISH LOGGER] ⚠️ Could not find Items folder in ReplicatedStorage")
+        warn("[FISH LOGGER] Could not find Items folder in ReplicatedStorage")
         return
     end
 
+    FishDatabase = {}
+    FishIndexByNormalizedName = {}
+
     local count = 0
-    for _, item in ipairs(ItemsFolder:GetChildren()) do
+    for _, item in ipairs(ItemsFolder:GetDescendants()) do
         if item:IsA("ModuleScript") then
             local ok, data = pcall(require, item)
             if ok and data and data.Data then
                 local fishData = data.Data
                 if fishData.Type == "Fish" and fishData.Name then
-                    FishDatabase[fishData.Name] = {
+                    local entry = {
+                        Name      = fishData.Name,
                         Icon      = fishData.Icon or "",
                         Tier      = fishData.Tier or "Unknown",
                         SellPrice = data.SellPrice or 0,
                         Id        = fishData.Id or 0
                     }
+                    FishDatabase[fishData.Name] = entry
+                    FishIndexByNormalizedName[normalizeFishName(fishData.Name)] = entry
+                    count += 1
+                end
+            elseif not ok then
+                local fallback = parseFishFromModuleSource(getModuleSourceText(item), item.Name)
+                if fallback and fallback.Name then
+                    FishDatabase[fallback.Name] = fallback
+                    FishIndexByNormalizedName[normalizeFishName(fallback.Name)] = fallback
                     count += 1
                 end
             end
         end
     end
 
-    print("[FISH LOGGER] 📦 Loaded", count, "fish into database")
+    print("[FISH LOGGER] Loaded", count, "fish into database")
 end
-
 local function cleanFishName(fishName)
     local cleaned = fishName
 
@@ -196,6 +263,8 @@ end
 local function getThumbnailURL(fishName)
     local cleanedName = cleanFishName(fishName)
     local fishData    = FishDatabase[cleanedName]
+        or FishIndexByNormalizedName[normalizeFishName(cleanedName)]
+        or FishIndexByNormalizedName[normalizeFishName(fishName)]
     if not fishData or not fishData.Icon then
         return "https://i.ibb.co.com/q38LKrcJ/image.png"
     end
@@ -251,7 +320,6 @@ local function detectMutation(fishName)
     end
     return "None"
 end
-
 ----------------------------------------------------------------
 -- UTIL
 ----------------------------------------------------------------
@@ -426,11 +494,11 @@ local function sendToWebhook(catchData)
     local embed = {
         embeds = {{
             title       = "[🔒] RENNB PRIVATE - [ SERVER MONITORING ]",
-            description = string.format("[**%s**] has obtained a [**%s**] - [CONGRATULATIONS !!]", catchData.player, catchData.fish),
+            description = string.format("[**%s**] has obtained a [**%s**]\nCONGRATULATIONS [🎊]", catchData.player, catchData.fish),
             color       = embedColor,
             thumbnail   = { url = thumbnailUrl },
             fields = {
-                { name = "🐟 FISH",     value = "`" .. cleanedFish      .. "`", inline = true },
+                { name = "🐳 FISH",     value = "`" .. cleanedFish      .. "`", inline = true },
                 { name = "🧬 MUTATION", value = "`" .. mutation         .. "`", inline = true },
                 { name = "✨ RARITY",   value = "`" .. rarity           .. "`", inline = true },
                 { name = "👤 PLAYER",   value = "`" .. catchData.player .. "`", inline = true },
@@ -971,7 +1039,7 @@ testBtn.MouseButton1Click:Connect(function()
         return
     end
 
-    local testFishName = "CRYSTALIZED Frostborn Shark"
+    local testFishName = "CRYSTALIZED Broken Heart Nessie"
     local cleanedFish = cleanFishName(testFishName)
     local mutation = detectMutation(testFishName)
     local thumbnailUrl = getThumbnailURL(testFishName)
@@ -981,7 +1049,7 @@ testBtn.MouseButton1Click:Connect(function()
     local testEmbed = {
         embeds = {{
             title       = "[🔒] RENNB PRIVATE - [ SERVER CONNECTED ]",
-            description = string.format("[ **%s** ] has obtained a [ **%s** ] - [ WEBHOOK CONNECTED !! ]", Player.Name, testFishName),
+            description = string.format("[ **%s** ] has obtained a [ **%s** ]\nWEBHOOK CONNECTED [✅]", Player.Name, testFishName),
             color       = embedColor,
             thumbnail   = { url = thumbnailUrl },
             fields = {
